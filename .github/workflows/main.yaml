@@ -1,0 +1,76 @@
+name: GitHub CI
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: overwatch_meta
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pixlet-version: ["0.33.5"]
+    defaults:
+      run:
+        shell: bash
+    if: (github.event_name == 'pull_request') && (github.event.action != 'closed')
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Modified Files
+        id: modified-files
+        run: |
+          set -x
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "MODIFIED_FILES<<$EOF" >> $GITHUB_ENV
+          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | sort >> $GITHUB_ENV
+          echo "$EOF" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Enforce Changelog Modifications
+        run: |
+          set -ex
+
+          modified_files="${{ env.MODIFIED_FILES }}"
+          echo $modified_files | grep -e "CHANGELOG.md"
+        shell: bash
+
+      - name: Setup Pixlet ${{ matrix.pixlet-version }}
+        run: |
+          set -x
+
+          ENV_PIXLET_VERSION=${{ matrix.pixlet-version }}
+    
+          ./install_pixlet.sh
+
+          echo "::Validate Pixlet Installed::"
+          pixlet version
+
+      - name: Format
+        run: |
+          pixlet format -d apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
+
+      - name: Lint
+        run: |
+          pixlet check apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
+
+      - name: Execute Tests
+        run: |
+          set -x
+          poetry run pytest --cov-report=xml --cov-fail-under=80 --cov=gebaWeb tests/

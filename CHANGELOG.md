@@ -1,0 +1,6 @@
+- [0.1.0](https://github.com/GeoffBarrett/OverwatchMetaByt/pull/1) - 2024-09-23
+  - Initial Repository Push
+  - _Added_
+    - Added devcontainer configuration.
+    - Added github workflows.
+    - Initialized application.
