@@ -1,6 +1,8 @@
-- [0.1.0](https://github.com/GeoffBarrett/OverwatchMetaByt/pull/1) - 2024-09-23
+- [0.1.0](https://github.com/GeoffBarrett/OverwatchMetaByt/pull/1) - 2024-09-27
   - Initial Repository Push
   - _Added_
     - Added devcontainer configuration.
     - Added github workflows.
     - Initialized application.
+    - Added the `overwatch_meta` app.
+      - Currently it will retreive the pick rate percentages and scroll the top 5 pick rates.
