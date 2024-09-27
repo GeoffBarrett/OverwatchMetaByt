@@ -65,7 +65,7 @@ SHORT_HERO_NAME_MAP = {
     "Zenyatta": "Zen",
     "Baptiste": "Bap",
     "Doomfist": "Doom",
-    "Lifeweaver": "LW",
+    "Lifeweaver": "LWeaver",
     "Brigitte": "Brig",
     "Junker Queen": "J Queen",
     "Ramattra": "Ram",
