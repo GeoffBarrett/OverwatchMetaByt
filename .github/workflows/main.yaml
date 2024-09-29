@@ -57,7 +57,13 @@ jobs:
 
           ENV_PIXLET_VERSION=${{ matrix.pixlet-version }}
     
-          ./install_pixlet.sh
+          URL="https://github.com/tidbyt/pixlet/releases/download/v${ENV_PIXLET_VERSION}/pixlet_${ENV_PIXLET_VERSION}_linux_amd64.tar.gz"
+
+          echo "Installing version ${TAG} from - ${URL}"
+
+          wget -O pixlet.tar.gz $URL
+          tar -xzf pixlet.tar.gz pixlet
+          mv pixlet /usr/local/bin/
 
           echo "::Validate Pixlet Installed::"
           pixlet version
