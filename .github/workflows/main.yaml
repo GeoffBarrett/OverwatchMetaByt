@@ -1,0 +1,96 @@
+name: GitHub CI
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: overwatch_meta
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pixlet-version: ["0.33.5"]
+    defaults:
+      run:
+        shell: bash
+    if: (github.event_name == 'pull_request') && (github.event.action != 'closed')
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Modified Files
+        id: modified-files
+        run: |
+          set -x
+
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "MODIFIED_FILES<<$EOF" >> $GITHUB_ENV
+          git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | sort >> $GITHUB_ENV
+          echo "$EOF" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Enforce Changelog Modifications
+        run: |
+          set -ex
+
+          modified_files="${{ env.MODIFIED_FILES }}"
+          echo $modified_files | grep -e "CHANGELOG.md"
+        shell: bash
+
+      - name: Setup Pixlet ${{ matrix.pixlet-version }}
+        run: |
+          set -ex
+
+          ENV_PIXLET_VERSION=${{ matrix.pixlet-version }}
+    
+          URL="https://github.com/tidbyt/pixlet/releases/download/v${ENV_PIXLET_VERSION}/pixlet_${ENV_PIXLET_VERSION}_linux_amd64.tar.gz"
+
+          echo "Installing version ${TAG} from - ${URL}"
+
+          wget -O pixlet.tar.gz $URL
+          tar -xzf pixlet.tar.gz pixlet
+          mv pixlet /usr/local/bin/
+
+          echo "::Validate Pixlet Installed::"
+          pixlet version
+
+      - name: Format
+        run: |
+          set -ex
+          pixlet format -d apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
+
+      - name: Lint
+        run: |
+          set -ex
+          pixlet check apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
+
+      - name: Create Render
+        id: render
+        run: |
+          set -ex
+          output_file=${{ env.APP_NAME }}_${{ matrix.pixlet-version }}.webp
+          pixlet render apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star \
+            -o $output_file -m 10
+          echo "renderFile=${output_file}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Render
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: App Render
+          path: |
+            ${{ steps.render.outputs.renderFile }}
