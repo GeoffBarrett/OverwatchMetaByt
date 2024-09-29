@@ -5,12 +5,12 @@ Description: This app polls the Overwatch 2 Meta information from Overbuff.
 Author: GeoffBarrett
 """
 
-load("render.star", "render")
-load("http.star", "http")
-load("schema.star", "schema")
-load("re.star", "re")
 load("bsoup.star", "bsoup")
 load("html.star", "html")
+load("http.star", "http")
+load("re.star", "re")
+load("render.star", "render")
+load("schema.star", "schema")
 
 FONT = "Dina_r400-6"
 LIGHT_BLUE = "#699dff"
