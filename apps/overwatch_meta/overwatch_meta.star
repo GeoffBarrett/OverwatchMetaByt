@@ -15,11 +15,15 @@ load("html.star", "html")
 FONT = "Dina_r400-6"
 LIGHT_BLUE = "#699dff"
 WHITE = "#FFFFFF"
+LEFT_PAD_1PX = (1, 0, 0, 0)  # left pad by 1
 
+# request constants
 CACHE_TIMEOUT_DEFAULT = 120
 DAY_IN_SECONDS = 86400
 BASE_URL = "https://www.overbuff.com"
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+USER_AGENT = "Tidbyt"
+
+# content regex patterns
 PCT_PATTERN = "(\\d+\\.\\d+)$"
 ALPHA_ALPHA_NUM_PATTERN = "([a-zA-Z]+\\d+\\.\\d+)"
 CHAR_TYPE_PATTERN = "(Support|Damage|Tank)$"
@@ -30,15 +34,33 @@ PICK_RATE_STOP = "Highest Win Rate"
 HIGHEST_WIN_RATE_START = "Win Rate"
 HIGHEST_WIN_RATE_STOP = "Highest KDA Ratio"
 
+# the statistics types to render.
+STATISTICS_TYPES = struct(win_rate = "win_rate", pick_rate = "pick_rate")
+
+# A map of titles to render
+STATISTICS_TITLE = {
+    STATISTICS_TYPES.win_rate: "Win Rate",
+    STATISTICS_TYPES.pick_rate: "Pick Rate",
+}
+
 # platform types
-platform_types = struct(console = "console", pc = "pc")
+PLATFORM_TYPES = struct(console = "console", pc = "pc")
 
 # game modes
-game_modes = struct(quickplay = "quickplay", competitive = "competitive")
+GAME_MODES = struct(quickplay = "quickplay", competitive = "competitive")
+
+# hero roles
+ROLES = struct(
+    all = "all",
+    damage = "damage",
+    tank = "tank",
+    support = "support",
+)
 
 # time modes
-time_windows = struct(
+TIME_WINDOWS = struct(
     all_time = "all_time",
+    this_week = "week",
     this_month = "month",
     last_three_months = "3months",
     last_six_months = "6months",
@@ -46,7 +68,7 @@ time_windows = struct(
 )
 
 # skill tiers
-skill_tiers = struct(
+SKILL_TIERS = struct(
     all = "all",
     bronze = "bronze",
     silver = "silver",
@@ -57,6 +79,8 @@ skill_tiers = struct(
     grandmaster = "grandmaster",
 )
 
+#: The app prefers having a maximum text length of seven characters, this map is of full character
+#: names to their respective shortened values.
 SHORT_HERO_NAME_MAP = {
     "Wrecking Ball": "Ball",
     "Widowmaker": "Widow",
@@ -96,14 +120,14 @@ def get_cachable_data(url, timeout, params = {}, headers = {}):
         headers (Dict[str, str]): headers.
 
     Returns:
-        Response: the HTML response.
+        str: the HTML response as a string.
     """
     res = http.get(url = url, ttl_seconds = timeout, params = params, headers = headers)
 
     if res.status_code != 200:
-        fail("request to %s failed with status code: %d - %s" % (url, res.status_code, res.body()))
+        return ""
 
-    return res
+    return res.body()
 
 def get_split_string_cleaned(input_text, split_pattern):
     """A helper function that splits a string and filters empty strings.
@@ -195,39 +219,39 @@ def get_win_rate_raw_list(input_text):
 
     return split_by_percentage(win_rates)
 
-def parse_char_type_percentage(pick_rate_text):
+def parse_char_type_percentage(input_text):
     """Extract the Character - Character Type - Percentage value from text.
 
     This text contains the statistics in the following format:
     "{Character}{CharacterType}{PickPercentage}".
 
     Args:
-        pick_rate_text (str): HTML text from Overbuff containing the pick rate contents.
+        input_text (str): HTML text from Overbuff containing the statistics content.
 
     Returns:
         Optional[Tuple[str, str, str]]: an optional
-            (character, character_type, pick_rate_percentage) tuple containing the pick rate
+            (character, character_type, statistic_value) tuple containing the statistic
             details.
     """
 
-    # extract pick rate percentage
-    pick_rate_percentage = re.findall(PCT_PATTERN, pick_rate_text)
-    if len(pick_rate_percentage) == 0:
+    # extract statistic value
+    statistic_value = re.findall(PCT_PATTERN, input_text)
+    if len(statistic_value) == 0:
         return None
 
-    pick_rate_percentage = pick_rate_percentage[0]
+    statistic_value = statistic_value[0]
 
     # extract character type
-    pick_rate_text = re.split(pick_rate_percentage, pick_rate_text)[0]
-    character_type = re.findall(CHAR_TYPE_PATTERN, pick_rate_text)
+    input_text = re.split(statistic_value, input_text)[0]
+    character_type = re.findall(CHAR_TYPE_PATTERN, input_text)
     if len(character_type) == 0:
         return None
 
     character_type = character_type[0]
 
     # extract the character's name
-    character = re.split(character_type, pick_rate_text)[0]
-    return (character, character_type, pick_rate_percentage)
+    character = re.split(character_type, input_text)[0]
+    return (character, character_type, statistic_value)
 
 def make_overbuff_get_request(
         parameters = {},
@@ -243,14 +267,11 @@ def make_overbuff_get_request(
     Returns:
         str: request body text.
     """
-
-    # Will receive a 429 without a user-agent specified
-    headers = {"User-Agent": USER_AGENT}
+    headers = {"User-Agent": USER_AGENT}  # Will receive a 429 without a user-agent specified
     url = "{}/{}".format(BASE_URL, endpoint)
-    print("Making request to {} with params {}.".format(url, parameters))
-    response = get_cachable_data(url, timeout, params = parameters, headers = headers)
+    response_html = get_cachable_data(url, timeout, params = parameters, headers = headers)
 
-    return response.body()
+    return response_html
 
 def get_overbuff_soup_object(
         parameters = {},
@@ -276,8 +297,9 @@ def get_overbuff_soup_object(
     return soup
 
 def get_overbuff_text(
-        platform = platform_types.pc,
+        platform = PLATFORM_TYPES.pc,
         game_mode = None,
+        role = None,
         time_window = None,
         skill_tier = None,
         endpoint = "meta",
@@ -287,6 +309,7 @@ def get_overbuff_text(
     Args:
         platform (str, optional): the platform to extract the data for. Defaults to "pc".
         game_mode (str, optional): the game-mode to extract the data for. Defaults to None.
+        role (str, optional): the hero role to extract the data for. Defaults to None.
         time_window (str, optional): the time-window to filter the data by. Defaults to None.
         skill_tier (str, optional): the skill tier to filter the data by. Defaults to None.
         endpoint (str, optional): the overbuff endpoint to retrieve text from. Defaults to "meta".
@@ -303,12 +326,16 @@ def get_overbuff_text(
     if game_mode:
         params["gameMode"] = game_mode
 
+    # add the hero role
+    if role != None and role != ROLES.all:
+        params["role"] = role
+
     # add a time window if there is one (and it isn't all time)
-    if time_window != None and time_window != time_windows.all_time:
+    if time_window != None and time_window != TIME_WINDOWS.all_time:
         params["timeWindow"] = time_window
 
     # add a skill tier if there is one (and it isn't all)
-    if skill_tier != None and skill_tier != skill_tiers.all:
+    if skill_tier != None and skill_tier != SKILL_TIERS.all:
         params["skillTier"] = skill_tier
 
     response = make_overbuff_get_request(
@@ -337,8 +364,6 @@ def get_heroes():
             if not hero:
                 continue
             heroes.append(hero)
-
-    print("Heroes received - {}".format(heroes))
     return heroes
 
 def find_image_with_size(image_sources, max_width = 50):
@@ -382,7 +407,6 @@ def get_hero_image_map(
     """
 
     hero_image_map = {}
-
     if heroes == None:
         # retrieve the list of heroes
         heroes = get_heroes()
@@ -405,25 +429,105 @@ def get_hero_image_map(
         hero_image = find_image_with_size(image_attrs.get("srcset"), max_width = max_width)
         hero_image_map[hero_name] = "{}{}".format(BASE_URL, hero_image)
 
-    print("Hero image map: {}".format(hero_image_map))
-
     return hero_image_map
 
 def render_error(error_message, width = 64):
     return render.Root(child = render.WrappedText(error_message, width = width))
 
-def render_pick_rates(
-        platform = platform_types.pc,
-        game_mode = game_modes.quickplay,
-        time_window = time_windows.last_three_months,
-        skill_tier = skill_tiers.all):
-    """Renders the pick rates.
+def render_hero_sections(title, sections_data, image_size = 18):
+    """Render the hero statistics sections.
 
     Args:
-        platform (str, optional): an optional platform to query pick rates from. Defaults to "pc".
-        game_mode (str, optional): an optional game mode to query pick rates from. Defaults to "pc".
-        time_window (str, optional): an optional time window to query pick rates from. Defaults to "pc".
-        skill_tier (str, optional): an optional skill tier to query pick rates from. Defaults to "pc".
+        title (str): the title of the statistics being rendered.
+        sections_data (List[struct]): a list of section structs containing the statistics
+            to render.
+        image_size (int, optional): the image size of the hero.
+
+    Returns:
+        Root: a root render instance.
+    """
+
+    if len(sections_data) == 0:
+        return render_error("Unable to retrieve the '{}' statistics.".format(title))
+
+    title_text = render.Padding(
+        pad = LEFT_PAD_1PX,  # left pad by 1
+        child = render.Text(content = title, color = LIGHT_BLUE, font = FONT),
+    )
+
+    # build the sections
+    sections = []
+    for section_data in sections_data:
+        hero_text = render.Column(
+            children = [
+                render.Text(
+                    content = get_shortend_hero_name(section_data.hero),
+                    color = WHITE,
+                    font = FONT,
+                ),
+                render.Text(
+                    content = "{}%".format(section_data.statistic),
+                    color = WHITE,
+                    font = FONT,
+                ),
+            ],
+        )
+
+        hero_image = render.Padding(
+            pad = LEFT_PAD_1PX,  # left pad by 1
+            child = render.Image(
+                src = section_data.hero_image,
+                width = image_size,
+                height = image_size,
+            ),
+        )
+
+        # the hero contents
+        hero_row = render.Row(
+            children = [hero_image, hero_text],
+            expanded = True,
+            main_align = "space_between",
+            cross_align = "end",
+        )
+
+        # add the title to the hero section to be rendered
+        hero_row_with_title = render.Column(
+            children = [
+                title_text,
+                hero_row,
+            ],
+        )
+
+        sections.append(hero_row_with_title)
+
+    # render the sections
+    seq = render.Sequence(children = sections)
+
+    return render.Root(
+        child = seq,
+        delay = 2000,  # ms between frames
+        show_full_animation = True,
+    )
+
+def render_statistics(
+        statistic = STATISTICS_TYPES.win_rate,
+        platform = PLATFORM_TYPES.pc,
+        game_mode = GAME_MODES.quickplay,
+        role = ROLES.all,
+        time_window = TIME_WINDOWS.last_three_months,
+        skill_tier = SKILL_TIERS.all):
+    """Renders the hero statistics.
+
+    Args:
+        statistic (str, optional): an optional statistic to render. Defaults to "win_rate".
+        platform (str, optional): an optional platform to query statistics from. Defaults to "pc".
+        game_mode (str, optional): an optional game mode to query statistics from. Defaults to
+            "quickplay".
+        role (str, optional): the hero role to extract the data for. Defaults to "all".
+        time_window (str, optional): an optional time window to query statistics from. Defaults to
+            "3months".
+        skill_tier (str, optional): an optional skill tier to query statistics from. Defaults to
+            "all".
 
     Returns:
         Root: a root render instance.
@@ -433,6 +537,7 @@ def render_pick_rates(
     meta_text = get_overbuff_text(
         platform = platform,
         game_mode = game_mode,
+        role = role,
         time_window = time_window,
         skill_tier = skill_tier,
         endpoint = "meta",
@@ -441,86 +546,151 @@ def render_pick_rates(
     # retrieve a map of hero name to hero icon
     hero_image_map = get_hero_image_map()
 
-    # list of pick rates (hero_name, hero_class, pick_rate)
-    pick_rates_list = get_pick_rate_raw_list(meta_text)
+    if statistic == STATISTICS_TYPES.pick_rate:
+        # list of pick rates (hero_name, hero_class, pick_rate)
+        statistics_list = get_pick_rate_raw_list(meta_text)
+    elif statistic == STATISTICS_TYPES.win_rate:
+        # list of win rates (hero_name, hero_class, win_rate)
+        statistics_list = get_win_rate_raw_list(meta_text)
+    else:
+        return render_error("Received unsupported statistic: '{}'.".format(statistic))
 
-    if len(pick_rates_list) == 0:
-        return render_error("Unable to retrieve the pick rate limit.")
+    if len(statistics_list) == 0:
+        return render_error("Unable to retrieve the '{}' statistic.".format(statistic))
 
-    columns = []
+    title = STATISTICS_TITLE[statistic]
+    sections = []
 
-    # add title text
-    title_row = render.Row(
-        children = [render.Text(content = "Pick Rate:", color = LIGHT_BLUE, font = FONT)],
-    )
-
-    # add child contents (Hero Image - Hero Name - Pick Rate %)
-    for stat in pick_rates_list:
+    # add child contents (Hero Image - Hero Name - Statistic %)
+    for stat in statistics_list:
         if len(stat) == 3:
             continue
 
-        pick_rate_details = parse_char_type_percentage(stat)
-        if pick_rate_details == None or len(pick_rate_details) != 3:
+        stat_details = parse_char_type_percentage(stat)
+        if stat_details == None or len(stat_details) != 3:
             continue
 
-        (hero_name, _, pick_rate_percentage) = pick_rate_details
+        (hero_name, _, stat_value) = stat_details
         if hero_name not in hero_image_map:
-            print("Unable to find {} in hero map.".format(hero_name))
             continue
 
         image_url = hero_image_map[hero_name]
         image_rep = http.get(image_url, ttl_seconds = DAY_IN_SECONDS)
 
         if image_rep.status_code != 200:
-            print("Unable to find the image {}.".format(image_url))
             continue
 
-        hero_text = render.Column(
-            children = [
-                render.Text(content = get_shortend_hero_name(hero_name), color = WHITE, font = FONT),
-                render.Text(content = "{}%".format(pick_rate_percentage), color = WHITE, font = FONT),
-            ],
+        section_data = struct(
+            hero = hero_name,
+            hero_image = image_rep.body(),
+            statistic = stat_value,
         )
 
-        hero_row = render.Row(
-            children = [
-                render.Image(src = image_rep.body(), width = 18, height = 18),
-                hero_text,
-            ],
-            expanded = True,
-            main_align = "space_between",
-            cross_align = "end",
-        )
+        sections.append(section_data)
 
-        hero_row_with_title = render.Column(
-            children = [
-                title_row,
-                hero_row,
-            ],
-        )
-
-        columns.append(hero_row_with_title)
-
-    seq = render.Sequence(children = columns)
-
-    return render.Root(
-        child = seq,
-        delay = 2000,  # ms between frames
-        show_full_animation = True,
-    )
+    return render_hero_sections(title, sections)
 
 def main(config):
-    return render_pick_rates()
+    """The app entry point.
+
+    Args:
+        config (AppletConfig): the user configured settings for the app.
+    """
+    return render_statistics(
+        statistic = config.get("statistic", STATISTICS_TYPES.win_rate),
+        platform = config.get("platform", PLATFORM_TYPES.pc),
+        game_mode = config.get("game_mode", GAME_MODES.quickplay),
+        role = config.get("role", ROLES.all),
+        skill_tier = config.get("skill_tier", SKILL_TIERS.all),
+        time_window = config.get("time_window", TIME_WINDOWS.last_three_months),
+    )
 
 def get_schema():
+    """Retrieve the app schema.
+
+    Returns:
+        Schema: the app schema.
+    """
     return schema.Schema(
         version = "1",
         fields = [
-            schema.Text(
-                id = "who",
-                name = "Who?",
-                desc = "Who to say hello to.",
-                icon = "user",
+            schema.Dropdown(
+                id = "statistic",
+                name = "Hero Statistic",
+                desc = "The hero statistics to display.",
+                icon = "percent",
+                options = [
+                    schema.Option(display = "Win Rate", value = STATISTICS_TYPES.win_rate),
+                    schema.Option(display = "Pick Rate", value = STATISTICS_TYPES.pick_rate),
+                ],
+                default = STATISTICS_TYPES.win_rate,
+            ),
+            schema.Dropdown(
+                id = "platform",
+                name = "Platform",
+                desc = "The platform to filter statistics by.",
+                icon = "desktop",
+                options = [
+                    schema.Option(display = "PC", value = PLATFORM_TYPES.pc),
+                    schema.Option(display = "Console", value = PLATFORM_TYPES.console),
+                ],
+                default = PLATFORM_TYPES.pc,
+            ),
+            schema.Dropdown(
+                id = "game_mode",
+                name = "Game Mode",
+                desc = "The game mode to filter statistics by.",
+                icon = "gamepad",
+                options = [
+                    schema.Option(display = "Quickplay", value = GAME_MODES.quickplay),
+                    schema.Option(display = "Competitive", value = GAME_MODES.competitive),
+                ],
+                default = GAME_MODES.quickplay,
+            ),
+            schema.Dropdown(
+                id = "role",
+                name = "Role",
+                desc = "The hero role to filter statistics by.",
+                icon = "userShield",
+                options = [
+                    schema.Option(display = "All", value = ROLES.all),
+                    schema.Option(display = "Damage", value = ROLES.damage),
+                    schema.Option(display = "Tank", value = ROLES.tank),
+                    schema.Option(display = "Support", value = ROLES.support),
+                ],
+                default = ROLES.all,
+            ),
+            schema.Dropdown(
+                id = "skill_tier",
+                name = "Skill Tier",
+                desc = "The skill tier to filter statistics by.",
+                icon = "rankingStar",
+                options = [
+                    schema.Option(display = "All", value = SKILL_TIERS.all),
+                    schema.Option(display = "Bronze", value = SKILL_TIERS.bronze),
+                    schema.Option(display = "Silver", value = SKILL_TIERS.silver),
+                    schema.Option(display = "Gold", value = SKILL_TIERS.gold),
+                    schema.Option(display = "Platinum", value = SKILL_TIERS.platinum),
+                    schema.Option(display = "Diamond", value = SKILL_TIERS.diamond),
+                    schema.Option(display = "Master", value = SKILL_TIERS.master),
+                    schema.Option(display = "Grandmaster", value = SKILL_TIERS.grandmaster),
+                ],
+                default = SKILL_TIERS.all,
+            ),
+            schema.Dropdown(
+                id = "time_window",
+                name = "Time Window",
+                desc = "The time window to filter statistics by.",
+                icon = "clock",
+                options = [
+                    schema.Option(display = "All Time", value = TIME_WINDOWS.all_time),
+                    schema.Option(display = "This Week", value = TIME_WINDOWS.this_week),
+                    schema.Option(display = "This Month", value = TIME_WINDOWS.this_month),
+                    schema.Option(display = "Last 3 Months", value = TIME_WINDOWS.last_three_months),
+                    schema.Option(display = "Last 6 Months", value = TIME_WINDOWS.last_six_months),
+                    schema.Option(display = "Last Year", value = TIME_WINDOWS.last_year),
+                ],
+                default = TIME_WINDOWS.last_three_months,
             ),
         ],
     )

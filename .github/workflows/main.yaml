@@ -53,7 +53,7 @@ jobs:
 
       - name: Setup Pixlet ${{ matrix.pixlet-version }}
         run: |
-          set -x
+          set -ex
 
           ENV_PIXLET_VERSION=${{ matrix.pixlet-version }}
     
@@ -64,13 +64,16 @@ jobs:
 
       - name: Format
         run: |
+          set -ex
           pixlet format -d apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
 
       - name: Lint
         run: |
+          set -ex
           pixlet check apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star
 
-      - name: Execute Tests
+      - name: Create Render
         run: |
-          set -x
-          poetry run pytest --cov-report=xml --cov-fail-under=80 --cov=gebaWeb tests/
+          set -ex
+          pixlet render apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star \
+            -o ${{ env.APP_NAME }}.webp -m 10
