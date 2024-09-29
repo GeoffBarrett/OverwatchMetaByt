@@ -84,7 +84,7 @@ jobs:
           set -ex
           output_file=${{ env.APP_NAME }}_${{ matrix.pixlet-version }}.webp
           pixlet render apps/${{ env.APP_NAME }}/${{ env.APP_NAME }}.star \
-            -o output_file -m 10
+            -o $output_file -m 10
           echo "renderFile=${output_file}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Render
