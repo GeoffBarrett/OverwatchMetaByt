@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pixlet-version: ["0.33.5"]
+        pixlet-version: ["0.34.0"]
     defaults:
       run:
         shell: bash

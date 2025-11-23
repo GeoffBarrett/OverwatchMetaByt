@@ -31,8 +31,8 @@
 			"onAutoForward": "notify"
 		}
 	},
-    "containerEnv": {"ENV_PIXLET_VERSION": "0.33.5"},
-	"remoteEnv": {"ENV_PIXLET_VERSION": "0.33.5"}
+    "containerEnv": {"ENV_PIXLET_VERSION": "0.34.0"},
+	"remoteEnv": {"ENV_PIXLET_VERSION": "0.34.0"}
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
