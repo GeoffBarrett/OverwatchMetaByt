@@ -18,7 +18,7 @@ WHITE = "#FFFFFF"
 LEFT_PAD_1PX = (1, 0, 0, 0)  # left pad by 1
 
 # request constants
-CACHE_TIMEOUT_DEFAULT = 5
+CACHE_TIMEOUT_DEFAULT = 120
 DAY_IN_SECONDS = 86400
 BASE_URL = "https://overwatch.blizzard.com"
 USER_AGENT = "Tidbyt"
