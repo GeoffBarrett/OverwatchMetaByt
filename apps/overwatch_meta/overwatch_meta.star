@@ -196,7 +196,7 @@ def get_rates_list(input_text, statistic):
 
     # If there's not enough data, the rate will be "--"
     # replace these with "0.0%"
-    rates = rates.replace("--", "0.0%")  
+    rates = rates.replace("--", "0.0%")
     rates_split = split_by_percentage(rates)
 
     # `rates_split` is structured in the following format:
@@ -206,7 +206,7 @@ def get_rates_list(input_text, statistic):
     for idx in range(0, len(rates_split) - 1):
         if idx % 2 == 1:
             continue
-        
+
         parse_results = parse_char_type_percentage(rates_split[idx])
         if parse_results == None:
             continue
@@ -253,10 +253,9 @@ def parse_char_type_percentage(input_text):
     return (character, win_rate)
 
 def make_blizzard_get_request(
-    parameters = {},
-    endpoint = RATES_ENDPONT,
-    timeout = CACHE_TIMEOUT_DEFAULT
-):
+        parameters = {},
+        endpoint = RATES_ENDPONT,
+        timeout = CACHE_TIMEOUT_DEFAULT):
     """Retrieve a BeautifulSoup object instance ingesting the response from blizzard.com.
 
     Args:
@@ -274,10 +273,9 @@ def make_blizzard_get_request(
     return response_html
 
 def get_blizzard_soup_object(
-    parameters = {},
-    endpoint = RATES_ENDPONT,
-    timeout = CACHE_TIMEOUT_DEFAULT
-):
+        parameters = {},
+        endpoint = RATES_ENDPONT,
+        timeout = CACHE_TIMEOUT_DEFAULT):
     """Retrieve a BeautifulSoup object instance ingesting the response from blizzard.com.
 
     Args:
@@ -298,13 +296,12 @@ def get_blizzard_soup_object(
     return soup
 
 def get_blizzard_text(
-    platform = PLATFORM_TYPES.pc,
-    game_mode = GAME_MODES.quickplay,
-    skill_tier = SKILL_TIERS.all,
-    region = REGION.americas,
-    endpoint = RATES_ENDPONT,
-    timeout = CACHE_TIMEOUT_DEFAULT
-):
+        platform = PLATFORM_TYPES.pc,
+        game_mode = GAME_MODES.quickplay,
+        skill_tier = SKILL_TIERS.all,
+        region = REGION.americas,
+        endpoint = RATES_ENDPONT,
+        timeout = CACHE_TIMEOUT_DEFAULT):
     """Retrieves the text contents from Blizzard's end-point.
 
     Args:
@@ -350,7 +347,7 @@ def get_hero_name_from_blz_card(hero_card):
     """Retrieve the hero name from the blz-card.
 
     Args:
-        hero_card (SoupNode): the soup node 
+        hero_card (SoupNode): the soup node
             for the ("blz-card") type.
 
     Returns:
@@ -366,7 +363,7 @@ def get_hero_role_from_blz_card(hero_card):
     """Retrieve the hero role from the blz-card.
 
     Args:
-        hero_card (SoupNode): the soup node 
+        hero_card (SoupNode): the soup node
             for the ("blz-card") type.
 
     Returns:
@@ -401,10 +398,9 @@ def get_heroes():
         hero_role = get_hero_role_from_blz_card(hero_card)
         if hero_name == None or hero_role == None:
             continue
-        
+
         heroes[hero_name] = hero_role
     return heroes
-
 
 def get_hero_image_map(heroes = None):
     """Retrieve a dictionary mapping the hero names to their respective images.
@@ -431,15 +427,15 @@ def get_hero_image_map(heroes = None):
         image = hero_card.find("blz-image")
         if image == None:
             continue
-       
+
         hero_name = get_hero_name_from_blz_card(hero_card)
         if hero_name == None:
             continue
-        
+
         if hero_name not in heroes:
             continue
 
-        image_attrs = image.attrs()        
+        image_attrs = image.attrs()
         hero_image_map[hero_name] = image_attrs.get("src")
 
     return hero_image_map
@@ -523,14 +519,13 @@ def render_hero_sections(title, sections_data, image_size = 18):
     )
 
 def render_statistics(
-    statistic = STATISTICS_TYPES.win_rate,
-    platform = PLATFORM_TYPES.pc,
-    game_mode = GAME_MODES.quickplay,
-    role = ROLES.all,
-    skill_tier = SKILL_TIERS.all,
-    region = REGION.americas,
-    max_length = 5,
-):
+        statistic = STATISTICS_TYPES.win_rate,
+        platform = PLATFORM_TYPES.pc,
+        game_mode = GAME_MODES.quickplay,
+        role = ROLES.all,
+        skill_tier = SKILL_TIERS.all,
+        region = REGION.americas,
+        max_length = 5):
     """Renders the hero statistics.
 
     Args:
@@ -585,7 +580,7 @@ def render_statistics(
 
         if hero_name not in heroes:
             continue
-        
+
         # filter by hero role
         if role != ROLES.all:
             hero_role = heroes[hero_name]
