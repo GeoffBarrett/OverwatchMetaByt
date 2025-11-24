@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pixlet-version: ["0.33.5"]
+        pixlet-version: ["0.34.0"]
     defaults:
       run:
         shell: bash
@@ -88,7 +88,7 @@ jobs:
           echo "renderFile=${output_file}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Render
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: App Render

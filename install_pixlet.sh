@@ -8,7 +8,7 @@ set -e
 # This script will install the latest released version of pixlet,
 # Unless this argument is set to a specific version tag
 # e.g. v0.22.7
-PIN_VERSION_TAG="${ENV_PIXLET_VERSION:-"0.33.5"}"
+PIN_VERSION_TAG="${ENV_PIXLET_VERSION:-"0.34.0"}"
 
 cd /tmp
 
